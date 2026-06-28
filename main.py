@@ -10,6 +10,7 @@ from src.analysis import calculate_daily_returns, print_return_summary
 from src.risk_metrics import (
     print_volatility_summary,
     print_drawdown_summary,
+    print_distribution_summary,
     annualized_volatility,
 )
 
@@ -55,5 +56,27 @@ def run_phase_4():
     print_drawdown_summary(TICKER, returns)
 
 
+def run_phase_5():
+    prices  = fetch(TICKER)
+    returns = calculate_daily_returns(prices)
+    print_return_summary(TICKER, returns)
+    print_drawdown_summary(TICKER, returns)
+    print_distribution_summary(TICKER, returns)
+
+    # Compare distribution shape across two different stocks
+    print("\n── Distribution comparison: AAPL vs GME ──")
+    from src.risk_metrics import distribution_stats
+    for ticker in ["AAPL", "GME"]:
+        prices  = fetch(ticker)
+        returns = calculate_daily_returns(prices)
+        s = distribution_stats(returns)
+        print(f"\n  {ticker}")
+        print(f"    Skewness  : {s['skewness']:.3f}")
+        print(f"    Kurtosis  : {s['kurtosis']:.3f}")
+        print(f"    VaR (95%) : {s['var_95']*100:.2f}%")
+        print(f"    Win Rate  : {s['win_rate']*100:.1f}%")
+    print()
+
+
 if __name__ == "__main__":
-    run_phase_4()
+    run_phase_5()

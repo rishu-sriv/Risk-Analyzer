@@ -206,3 +206,82 @@ def print_drawdown_summary(ticker: str, returns: pd.Series) -> None:
     print(f"  Duration (trading days): {duration['duration_days']}")
     print(f"  Current Drawdown       : {dd_now*100:.2f}%")
     print(f"{'='*45}\n")
+
+
+# ── Return Distribution ───────────────────────────────────────────────────────
+
+def distribution_stats(returns: pd.Series) -> dict:
+    """
+    Statistical shape of the return distribution.
+
+    Goes beyond mean and std to describe *how* returns are distributed —
+    are bad days worse than good days are good? Do extreme events happen
+    more often than a normal distribution would predict?
+
+    Args:
+        returns: Series of daily returns
+
+    Returns:
+        Dict with skewness, kurtosis, VaR, win rate, best/worst days
+    """
+    return {
+        "mean"          : returns.mean(),
+        "std"           : returns.std(),
+        "skewness"      : returns.skew(),
+        # pandas kurtosis() returns EXCESS kurtosis (normal distribution = 0)
+        # positive = fatter tails than normal, negative = thinner tails
+        "kurtosis"      : returns.kurtosis(),
+        # VaR: on the worst 5% of days, losses exceed this threshold
+        "var_95"        : returns.quantile(0.05),
+        "best_day"      : returns.max(),
+        "worst_day"     : returns.min(),
+        "positive_days" : int((returns > 0).sum()),
+        "negative_days" : int((returns < 0).sum()),
+        "win_rate"      : (returns > 0).mean(),
+    }
+
+
+def print_distribution_summary(ticker: str, returns: pd.Series) -> None:
+    """
+    Print a formatted return distribution summary to the terminal.
+
+    Args:
+        ticker: Stock ticker symbol
+        returns: Series of daily returns
+    """
+    s = distribution_stats(returns)
+
+    # Interpret skewness in plain English
+    if s["skewness"] < -0.5:
+        skew_label = "negatively skewed (bad days worse than good days are good)"
+    elif s["skewness"] > 0.5:
+        skew_label = "positively skewed (good days better than bad days are bad)"
+    else:
+        skew_label = "roughly symmetric"
+
+    # Interpret kurtosis in plain English
+    if s["kurtosis"] > 1:
+        kurt_label = "fat tails (extreme events more frequent than normal)"
+    elif s["kurtosis"] < -1:
+        kurt_label = "thin tails (fewer extreme events than normal)"
+    else:
+        kurt_label = "near-normal tails"
+
+    print(f"\n{'='*50}")
+    print(f"  Return Distribution Summary — {ticker}")
+    print(f"{'='*50}")
+    print(f"  Mean Daily Return  : {s['mean']*100:.4f}%")
+    print(f"  Std Dev            : {s['std']*100:.4f}%")
+    print(f"  ---")
+    print(f"  Skewness           : {s['skewness']:.4f}  ({skew_label})")
+    print(f"  Kurtosis (excess)  : {s['kurtosis']:.4f}  ({kurt_label})")
+    print(f"  ---")
+    print(f"  VaR (95%)          : {s['var_95']*100:.2f}%")
+    print(f"  (On 5% of days, loss exceeds this threshold)")
+    print(f"  ---")
+    print(f"  Best Day           : +{s['best_day']*100:.2f}%")
+    print(f"  Worst Day          : {s['worst_day']*100:.2f}%")
+    print(f"  Positive Days      : {s['positive_days']:,}")
+    print(f"  Negative Days      : {s['negative_days']:,}")
+    print(f"  Win Rate           : {s['win_rate']*100:.1f}%")
+    print(f"{'='*50}\n")
