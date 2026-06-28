@@ -72,3 +72,78 @@ def print_return_summary(ticker: str, returns: pd.Series) -> None:
     print(f"  Negative Days   : {stats['negative_days']:,}")
     print(f"  Win Rate        : {stats['win_rate']*100:.1f}%")
     print(f"{'='*45}\n")
+
+
+# ── Correlation ───────────────────────────────────────────────────────────────
+
+def build_returns_dataframe(returns_dict: dict) -> "pd.DataFrame":
+    """
+    Combine multiple return series into one aligned DataFrame.
+
+    Each key becomes a column. Dates that don't exist for all stocks
+    are dropped (inner join) so every row has data for every ticker.
+
+    Args:
+        returns_dict: Dict of {ticker: pd.Series of daily returns}
+
+    Returns:
+        DataFrame with one column per ticker, aligned on date
+    """
+    import pandas as pd
+    df = pd.DataFrame(returns_dict)
+    df = df.dropna()   # drop any dates missing for any ticker
+    return df
+
+
+def correlation_matrix(returns_dict: dict) -> "pd.DataFrame":
+    """
+    Compute pairwise Pearson correlation between all stocks.
+
+    Result is a symmetric NxN matrix where N = number of tickers.
+    Diagonal is always 1.0 (stock perfectly correlated with itself).
+    Off-diagonal shows how similarly each pair moves day to day.
+
+    Args:
+        returns_dict: Dict of {ticker: pd.Series of daily returns}
+
+    Returns:
+        DataFrame — the correlation matrix
+    """
+    df = build_returns_dataframe(returns_dict)
+    return df.corr()
+
+
+def print_correlation_matrix(corr_matrix: "pd.DataFrame") -> None:
+    """
+    Print the correlation matrix in a readable format.
+
+    Args:
+        corr_matrix: DataFrame output from correlation_matrix()
+    """
+    import pandas as pd
+    tickers = corr_matrix.columns.tolist()
+    col_w   = 10
+
+    print(f"\n{'='*55}")
+    print(f"  Correlation Matrix")
+    print(f"{'='*55}")
+
+    # header row
+    header = f"  {'':8}"
+    for t in tickers:
+        header += f"{t:>{col_w}}"
+    print(header)
+    print(f"  {'-'*( 8 + col_w * len(tickers))}")
+
+    # data rows
+    for row_ticker in tickers:
+        row = f"  {row_ticker:<8}"
+        for col_ticker in tickers:
+            val = corr_matrix.loc[row_ticker, col_ticker]
+            # highlight diagonal and strong correlations
+            row += f"{val:>{col_w}.3f}"
+        print(row)
+
+    print(f"{'='*55}")
+    print(f"  1.000 = perfect positive  |  0.000 = no relation")
+    print(f"  Negative = move in opposite directions\n")
