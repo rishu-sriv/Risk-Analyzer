@@ -113,3 +113,96 @@ def print_volatility_summary(ticker: str, returns: pd.Series) -> None:
     print(f"  Rolling 90d Vol (max) : {roll_90.max()*100:.2f}%")
     print(f"  Rolling 90d Vol (min) : {roll_90.min()*100:.2f}%")
     print(f"{'='*45}\n")
+
+
+# ── Drawdown ─────────────────────────────────────────────────────────────────
+
+def calculate_drawdown(returns: pd.Series) -> pd.Series:
+    """
+    Calculate the drawdown series from daily returns.
+
+    At each point in time, drawdown = % fall from the highest peak reached so far.
+    When the stock is at an all-time high, drawdown = 0%.
+    When it has fallen from its peak, drawdown is negative.
+
+    How it works:
+        1. Convert daily returns → cumulative growth curve  (1+r1)(1+r2)...
+        2. Track the running peak of that curve with cummax()
+        3. Drawdown = (current - peak) / peak
+
+    Args:
+        returns: Series of daily returns
+
+    Returns:
+        Series of drawdown values (always <= 0)
+    """
+    cumulative  = (1 + returns).cumprod()
+    rolling_max = cumulative.cummax()
+    drawdown    = (cumulative - rolling_max) / rolling_max
+    return drawdown
+
+
+def max_drawdown(returns: pd.Series) -> float:
+    """
+    The single worst drawdown over the entire period.
+    This is the minimum value of the drawdown series.
+
+    A result of -0.35 means the stock fell 35% from its peak at worst.
+
+    Args:
+        returns: Series of daily returns
+
+    Returns:
+        Float — maximum drawdown (always negative, e.g. -0.35 = -35%)
+    """
+    return calculate_drawdown(returns).min()
+
+
+def drawdown_duration(returns: pd.Series) -> dict:
+    """
+    Find the peak and trough dates of the maximum drawdown,
+    and calculate how many trading days the drawdown lasted.
+
+    Args:
+        returns: Series of daily returns
+
+    Returns:
+        Dict with peak_date, trough_date, and duration_days
+    """
+    drawdown    = calculate_drawdown(returns)
+    cumulative  = (1 + returns).cumprod()
+
+    trough_date = drawdown.idxmin()                          # date of worst drawdown
+    peak_date   = cumulative.loc[:trough_date].idxmax()      # date of prior peak
+
+    # count trading days between peak and trough (calendar days can be misleading)
+    trading_days = len(returns.loc[peak_date:trough_date])
+
+    return {
+        "peak_date"    : peak_date,
+        "trough_date"  : trough_date,
+        "duration_days": trading_days,
+    }
+
+
+def print_drawdown_summary(ticker: str, returns: pd.Series) -> None:
+    """
+    Print a formatted drawdown summary to the terminal.
+
+    Args:
+        ticker: Stock ticker symbol
+        returns: Series of daily returns
+    """
+    mdd      = max_drawdown(returns)
+    duration = drawdown_duration(returns)
+    dd_now   = calculate_drawdown(returns).iloc[-1]
+
+    print(f"\n{'='*45}")
+    print(f"  Drawdown Summary — {ticker}")
+    print(f"{'='*45}")
+    print(f"  Max Drawdown           : {mdd*100:.2f}%")
+    print(f"  Peak Date              : {duration['peak_date'].date()}")
+    print(f"  Trough Date            : {duration['trough_date'].date()}")
+    print(f"  Duration (trading days): {duration['duration_days']}")
+    print(f"  Current Drawdown       : {dd_now*100:.2f}%")
+    print(f"{'='*45}\n")

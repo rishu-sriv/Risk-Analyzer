@@ -7,8 +7,11 @@ Change TICKER and date range to explore different stocks.
 
 import yfinance as yf
 from src.analysis import calculate_daily_returns, print_return_summary
-from src.risk_metrics import print_volatility_summary, annualized_volatility
-
+from src.risk_metrics import (
+    print_volatility_summary,
+    print_drawdown_summary,
+    annualized_volatility,
+)
 
 TICKER = "AAPL"
 START  = "2020-01-01"
@@ -32,14 +35,9 @@ def run_phase_2():
 def run_phase_3():
     prices  = fetch(TICKER)
     returns = calculate_daily_returns(prices)
-
-    # Phase 2 summary — always good to see returns alongside vol
     print_return_summary(TICKER, returns)
-
-    # Phase 3 — volatility
     print_volatility_summary(TICKER, returns)
 
-    # Compare two stocks side by side
     print("\n── Volatility comparison: AAPL vs JNJ ──")
     for ticker in ["AAPL", "JNJ"]:
         prices  = fetch(ticker)
@@ -49,5 +47,13 @@ def run_phase_3():
     print()
 
 
+def run_phase_4():
+    prices  = fetch(TICKER)
+    returns = calculate_daily_returns(prices)
+    print_return_summary(TICKER, returns)
+    print_volatility_summary(TICKER, returns)
+    print_drawdown_summary(TICKER, returns)
+
+
 if __name__ == "__main__":
-    run_phase_3()
+    run_phase_4()
