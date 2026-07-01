@@ -18,14 +18,16 @@ from src.risk_metrics import (
     print_distribution_summary,
     annualized_volatility,
     distribution_stats,
+    build_comparison_table,
+    print_comparison_table,
 )
 
 TICKER  = "AAPL"
 START   = "2020-01-01"
 END     = "2024-12-31"
 
-# Phase 6 tickers — mix of tech, non-tech, and gold to show contrast
-TICKERS = ["AAPL", "MSFT", "GOOGL", "JPM", "GLD"]
+# Phase 7 — diverse mix: tech, finance, consumer, gold, volatile
+COMPARE_TICKERS = ["AAPL", "MSFT", "GOOGL", "JPM", "JNJ", "GLD", "GME"]
 
 
 def fetch(ticker: str):
@@ -87,32 +89,46 @@ def run_phase_5():
 def run_phase_6():
     print(f"\nFetching data for correlation analysis...")
     returns_dict = {}
-    for ticker in TICKERS:
-        prices  = fetch(ticker)
+    for ticker in ["AAPL", "MSFT", "GOOGL", "JPM", "GLD"]:
+        prices = fetch(ticker)
         returns_dict[ticker] = calculate_daily_returns(prices)
 
-    # Build and print correlation matrix
     corr = correlation_matrix(returns_dict)
     print_correlation_matrix(corr)
 
-    # Point out the most and least correlated pair
     import pandas as pd
-    # mask diagonal (self-correlations of 1.0)
-    masked = corr.where(
-        ~pd.DataFrame(
-            [[i == j for j in range(len(corr))] for i in range(len(corr))],
-            index=corr.index,
-            columns=corr.columns
-        )
-    )
-    # find highest and lowest pair
-    stack      = masked.stack()
-    max_pair   = stack.idxmax()
-    min_pair   = stack.idxmin()
-
+    masked  = corr.where(~pd.DataFrame(
+        [[i == j for j in range(len(corr))] for i in range(len(corr))],
+        index=corr.index, columns=corr.columns
+    ))
+    stack     = masked.stack()
+    max_pair  = stack.idxmax()
+    min_pair  = stack.idxmin()
     print(f"  Most correlated  : {max_pair[0]} & {max_pair[1]}  →  {corr.loc[max_pair]:.3f}")
     print(f"  Least correlated : {min_pair[0]} & {min_pair[1]}  →  {corr.loc[min_pair]:.3f}\n")
 
 
+def run_phase_7():
+    print(f"\nFetching data for {len(COMPARE_TICKERS)} stocks...\n")
+
+    tickers_returns = {}
+    for ticker in COMPARE_TICKERS:
+        prices = fetch(ticker)
+        tickers_returns[ticker] = calculate_daily_returns(prices)
+
+    # Build and print the full risk comparison table
+    df = build_comparison_table(tickers_returns)
+    print_comparison_table(df)
+
+    # Highlight key takeaways
+    best_sharpe  = df["Sharpe Ratio"].idxmax()
+    safest       = df["Max Drawdown"].idxmax()   # closest to 0 = least drawdown
+    most_volatile= df["Ann. Volatility"].idxmax()
+
+    print(f"  Best risk-adjusted return : {best_sharpe}  (Sharpe {df.loc[best_sharpe, 'Sharpe Ratio']:.3f})")
+    print(f"  Safest (least drawdown)   : {safest}  (Max DD {df.loc[safest, 'Max Drawdown']*100:.2f}%)")
+    print(f"  Most volatile             : {most_volatile}  (Vol {df.loc[most_volatile, 'Ann. Volatility']*100:.2f}%)\n")
+
+
 if __name__ == "__main__":
-    run_phase_6()
+    run_phase_7()

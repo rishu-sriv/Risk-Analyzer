@@ -285,3 +285,103 @@ def print_distribution_summary(ticker: str, returns: pd.Series) -> None:
     print(f"  Negative Days      : {s['negative_days']:,}")
     print(f"  Win Rate           : {s['win_rate']*100:.1f}%")
     print(f"{'='*50}\n")
+
+
+# ── Sharpe Ratio & Risk Comparison ───────────────────────────────────────────
+
+def sharpe_ratio(returns: pd.Series, risk_free_rate: float = 0.0) -> float:
+    """
+    Risk-adjusted return: how much return per unit of risk.
+
+    Formula: (Mean Annual Return - Risk Free Rate) / Annualized Volatility
+
+    We annualize mean return by multiplying daily mean by 252.
+    We annualize volatility by multiplying daily std by √252.
+
+    Args:
+        returns: Series of daily returns
+        risk_free_rate: Annual risk-free rate (default 0.0 for simplicity)
+
+    Returns:
+        Float — Sharpe ratio. Higher is better.
+        <0 = losing money, 0.5-1.0 = acceptable, >1.0 = good, >2.0 = excellent
+    """
+    mean_annual  = returns.mean() * TRADING_DAYS
+    annual_vol   = returns.std()  * np.sqrt(TRADING_DAYS)
+
+    if annual_vol == 0:
+        return 0.0
+
+    return (mean_annual - risk_free_rate) / annual_vol
+
+
+def risk_profile(ticker: str, returns: pd.Series) -> dict:
+    """
+    Compute all risk metrics for one stock in one dict.
+    Used to build the multi-stock comparison table.
+
+    Args:
+        ticker: Stock ticker symbol
+        returns: Series of daily returns
+
+    Returns:
+        Dict with all Phase 3-7 metrics for this stock
+    """
+    dd = calculate_drawdown(returns)
+    return {
+        "Ticker"          : ticker,
+        "Ann. Return"     : returns.mean() * TRADING_DAYS,
+        "Ann. Volatility" : annualized_volatility(returns),
+        "Sharpe Ratio"    : sharpe_ratio(returns),
+        "Max Drawdown"    : max_drawdown(returns),
+        "VaR (95%)"       : returns.quantile(0.05),
+        "Win Rate"        : (returns > 0).mean(),
+        "Curr. Drawdown"  : dd.iloc[-1],
+    }
+
+
+def build_comparison_table(tickers_returns: dict) -> "pd.DataFrame":
+    """
+    Build a multi-stock risk comparison DataFrame.
+
+    Args:
+        tickers_returns: Dict of {ticker: pd.Series of daily returns}
+
+    Returns:
+        DataFrame with one row per stock, sorted by Sharpe Ratio descending
+    """
+    import pandas as pd
+    rows = [risk_profile(ticker, returns)
+            for ticker, returns in tickers_returns.items()]
+
+    df = pd.DataFrame(rows).set_index("Ticker")
+    df = df.sort_values("Sharpe Ratio", ascending=False)
+    return df
+
+
+def print_comparison_table(df: "pd.DataFrame") -> None:
+    """
+    Print the risk comparison table in a readable terminal format.
+
+    Args:
+        df: DataFrame from build_comparison_table()
+    """
+    print(f"\n{'='*75}")
+    print(f"  Multi-Stock Risk Comparison Table  (sorted by Sharpe Ratio)")
+    print(f"{'='*75}")
+    print(f"  {'Ticker':<8} {'Ann.Ret':>9} {'Ann.Vol':>9} {'Sharpe':>8} {'Max DD':>9} {'VaR95%':>8} {'WinRate':>8}")
+    print(f"  {'-'*68}")
+
+    for ticker, row in df.iterrows():
+        print(
+            f"  {ticker:<8}"
+            f"  {row['Ann. Return']*100:>7.2f}%"
+            f"  {row['Ann. Volatility']*100:>7.2f}%"
+            f"  {row['Sharpe Ratio']:>8.3f}"
+            f"  {row['Max Drawdown']*100:>7.2f}%"
+            f"  {row['VaR (95%)']*100:>6.2f}%"
+            f"  {row['Win Rate']*100:>6.1f}%"
+        )
+
+    print(f"{'='*75}")
+    print(f"  Sharpe > 1.0 = good  |  Max DD closer to 0% = safer  |  Higher win rate = more consistent\n")
